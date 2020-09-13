@@ -57,7 +57,20 @@ def handle_telegram(telegram_payload):
 
     # check that we know the user
     user_id = message.from_user.id
-    instance_id = os.getenv("USER_%s_INSTANCE" % user_id)
+
+    instance_code = ""
+    parts = message.text.split("_")
+    if len(parts) != 2:
+        parts = message.text.split(" ")
+    if len(parts) == 2:
+        instance_code = parts[1]
+    instance_code = instance_code.upper()
+
+    param = "USER_%s_INSTANCE" % user_id
+    if instance_code:
+        param += "_" + instance_code
+    instance_id = os.getenv(param)
+
     user_code = os.getenv("USER_%s_CODE" % user_id)
     if not (instance_id and user_code):
         bot.sendMessage(message.chat.id, "Access denied!")
@@ -65,15 +78,18 @@ def handle_telegram(telegram_payload):
 
     instance = ec2.Instance(instance_id)
     # do what the user asks
-    if message.text == "/up":
-        start_instance(message, instance, user_code)
-    if message.text == "/status":
-        send_status(message, instance, user_code)
-    elif message.text == "/shutdown":
-        confirm_buttons = ReplyKeyboardMarkup([["Shutdown", "Cancel"]])
+    if message.text.startswith("/up"):
+        start_instance(message, instance, user_code, instance_code)
+    if message.text.startswith("/status"):
+        send_status(message, instance, instance_code, user_code)
+    elif message.text.startswith("/shutdown"):
+        label = "Shutdown"
+        if instance_code:
+            label += " " + instance_code
+        confirm_buttons = ReplyKeyboardMarkup([[label, "Cancel"]])
         bot.sendMessage(message.chat.id, "Are you sure?", reply_markup=confirm_buttons)
-    elif str(message.text).lower() == "shutdown":
-        stop_instance(message, instance)
+    elif str(message.text).lower().startswith("shutdown"):
+        stop_instance(message, instance, instance_code)
     elif str(message.text).lower() == "cancel":
         bot.sendMessage(message.chat.id, "Canceled", reply_markup=ReplyKeyboardRemove())
 
@@ -82,24 +98,24 @@ def handle_cron(cloudwatch_time):
     unixtime = (dt - datetime(1970, 1, 1)).total_seconds()
     # TODO
 
-def start_instance(message, instance, user_code):
-    bot.sendMessage(message.chat.id, "Instance is starting...")
+def start_instance(message, instance, user_code, instance_code):
+    bot.sendMessage(message.chat.id, "Instance %s is starting..." % instance_code)
     response = instance.start()
     if DEBUG:
         bot.sendMessage(message.chat.id, "Response from AWS: %s" % json.dumps(response))
     instance.wait_until_running()
-    send_status(message, instance, user_code)
+    send_status(message, instance, instance_code, user_code)
 
-def stop_instance(message, instance):
-    bot.sendMessage(message.chat.id, "Instance is stopping...", reply_markup=ReplyKeyboardRemove())
+def stop_instance(message, instance, instance_code):
+    bot.sendMessage(message.chat.id, "Instance %s is stopping..." % instance_code, reply_markup=ReplyKeyboardRemove())
     response = instance.stop()
     if DEBUG:
         bot.sendMessage(message.chat.id, "Response from AWS: %s" % json.dumps(response))
     instance.wait_until_stopped()
-    send_status(message, instance)
+    send_status(message, instance, instance_code)
 
-def send_status(message, instance, user_code=None):
-    msg = ["Status: %s" % instance.state['Name']]
+def send_status(message, instance, instance_code, user_code=None):
+    msg = ["%s Status: %s" % (instance_code, instance.state['Name'])]
     if instance.public_dns_name:
         msg.append("Public DNS: %s " % instance.public_dns_name)
 
@@ -109,6 +125,9 @@ def send_status(message, instance, user_code=None):
     if state_code & 255 == 16:
         # running
         msg.append("")
-        msg.append("To stop instance click /shutdown or schedule message \"Shutdown\"")
+        if instance_code:
+            msg.append("To stop instance click /shutdown_{code} or schedule message \"Shutdown {code}\"".format(code=instance_code))
+        else:
+            msg.append("To stop instance click /shutdown or schedule message \"Shutdown\"")
 
     bot.sendMessage(message.chat.id, '\n'.join(msg))

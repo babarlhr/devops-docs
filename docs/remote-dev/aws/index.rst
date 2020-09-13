@@ -36,6 +36,12 @@ Control commands
 * /shutdown -- turn the instance off after confirmation
 * Shutdown -- turn the instance off without confirmation
 
+You may use several instances. In this case add instance code to commands, e.g.
+
+* /up_windows
+* /status_windows
+* /shutdown_windows
+* Shutdown Windows
 
 Settings
 ========
@@ -43,15 +49,15 @@ Settings
 On creating AWS Lambda, you would need to set following Environment variables:
 
 * TELEGRAM_TOKEN=<telegram token you got from Bot Father>
-* DOMAIN="USERCODE.example.com"
-* DOMAIN_NO_SSL="USERCODE.nossl.example.com"
+* DOMAIN="USERCODE.INSTANCECODE.example.com"
+* DOMAIN_NO_SSL="USERCODE.INSTANCECODE.nossl.example.com"
 * USER_123_INSTANCE=*<Instance ID>*, USER_123_CODE=*some-user-code*
 
   * 123 is a telegram user ID. You can get one via `Get My ID bot <https://telegram.me/itpp_myid_bot>`__
   * *Instance ID* looks like ``i-07e6...`` and can be found in Description tab of existing Instance
+  * For multi-server setup, add intance code to the variable name, e.g. USER_123_INSTANCE_WINDOWS
 * AUTO_SHUTDOWN_SOFT=*<Minutes after last /up command to send a message with /up /shutdown commands and warning about comming hard shutdown>*
 * AUTO_SHUTDOWN_HARD=*<Minutes after last /up command to shutdown server without user confirmation>*
-
   
 * LOG_LEVEL=<LEVEL> -- ``DEBUG``, ``INFO``, etc.
 
